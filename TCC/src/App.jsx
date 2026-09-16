@@ -87,5 +87,6 @@ export default function App() {
         {activeTab === 'admin' && <AdminPanel />}
       </main>
     </div>
+    
   );
 }
