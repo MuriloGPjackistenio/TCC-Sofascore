@@ -1,37 +1,110 @@
-import { pgTable, serial, varchar, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { eq } from 'drizzle-orm';
+import { teams, matches, matchEvents } from './db/schema.js';
 
-// 1. Tabela de Equipas (Teams)
-export const teams = pgTable('teams', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull(),
-  code: varchar('code', { length: 10 }).notNull(), // Ex: "PSG", "BAY"
-  logoUrl: varchar('logo_url', { length: 255 }),
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const sql = neon(process.env.DATABASE_URL);
+export const db = drizzle(sql);
+
+app.use(cors());
+app.use(express.json());
+
+
+app.get('/', (req, res) => {
+  res.json({ message: 'API rodando com certeza sim sim claro deu certo pode sair API cim cim slaro' });
 });
 
-// 2. Tabela de Partidas (Matches)
-export const matches = pgTable('matches', {
-  id: serial('id').primaryKey(),
-  phase: varchar('phase', { length: 50 }).notNull(), // Ex: "Quarter-finals", "Semifinal"
-  status: varchar('status', { length: 20 }).default('SCHEDULED'), // Ex: "SCHEDULED", "LIVE", "ENDED"
-  isLive: boolean('is_live').default(false),
-  
-  // Relação com as equipas (Chaves Estrangeiras)
-  homeTeamId: integer('home_team_id').references(() => teams.id),
-  awayTeamId: integer('away_team_id').references(() => teams.id),
-  
-  homeScore: integer('home_score').default(0),
-  awayScore: integer('away_score').default(0),
-  
-  createdAt: timestamp('created_at').defaultNow(),
+
+// Listar todas equipes
+app.get('/teams', async (req, res) => {
+  try {
+    const allTeams = await db.select().from(teams);
+    res.json(allTeams);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao buscar equipes.' });
+  }
 });
 
-// 3. Tabela de Eventos do Jogo (Cartões e Substituições)
-export const matchEvents = pgTable('match_events', {
-  id: serial('id').primaryKey(),
-  matchId: integer('match_id').references(() => matches.id).notNull(),
-  
-  type: varchar('type', { length: 20 }).notNull(), // "CARD_YELLOW", "CARD_RED", "SUBSTITUTION"
-  minute: varchar('minute', { length: 10 }).notNull(), // Ex: "45'", "90+2'"
-  playerName: varchar('player_name', { length: 100 }).notNull(),
-  detail: varchar('detail', { length: 255 }), // Ex: "Entrou: #10 Silva / Saiu: #7 Santos"
+//Criar nova equipe
+app.post('/teams', async (req, res) => {
+  try {
+    const { name, code, logoUrl } = req.body;
+    const newTeam = await db.insert(teams).values({ name, code, logoUrl }).returning();
+    res.status(201).json(newTeam[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao criar equipe.' });
+  }
+});
+
+//Listar todas partidas
+app.get('/matches', async (req, res) => {
+  try {
+    const allMatches = await db.select().from(matches);
+    res.json(allMatches);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao buscar partidas.' });
+  }
+});
+
+//Criar nova partida
+app.post('/matches', async (req, res) => {
+  try {
+    const { phase, homeTeamId, awayTeamId } = req.body;
+    const newMatch = await db.insert(matches).values({
+      phase,
+      homeTeamId,
+      awayTeamId,
+      status: 'SCHEDULED'
+    }).returning();
+
+    res.status(201).json(newMatch[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao criar partida.' });
+  }
+});
+
+//Atualizar resultado/status da partida
+app.put('/matches/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { homeScore, awayScore, status, isLive } = req.body;
+
+    const updatedMatch = await db.update(matches)
+      .set({ homeScore, awayScore, status, isLive })
+      .where(eq(matches.id, Number(id)))
+      .returning();
+
+    res.json(updatedMatch[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao atualizar partida.' });
+  }
+});
+
+//Apagar uma partida
+app.delete('/matches/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.delete(matches).where(eq(matches.id, Number(id)));
+    res.json({ message: 'Partida cancelada com sucesso!' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao apagar a partida.' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`API do site sis ism rodando na porta: http://localhost:${PORT}`);
 });

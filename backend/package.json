@@ -8,12 +8,15 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
-    "dotenv": "^18.0.4",
-    "drizzle-orm": "^0.45.3",
+    "@neondatabase/serverless": "^1.2.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.6",
+    "drizzle-orm": "^0.45.4",
+    "express": "^5.3.0",
     "pg": "^8.23.0"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.11"
+    "drizzle-kit": "^0.31.11",
+    "nodemon": "^3.1.14"
   }
 }
