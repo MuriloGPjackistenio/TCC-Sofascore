@@ -1,110 +1,136 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { eq } from 'drizzle-orm';
+import { db } from './db/index.js';
 import { teams, matches, matchEvents } from './db/schema.js';
+import { eq } from 'drizzle-orm';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-const sql = neon(process.env.DATABASE_URL);
-export const db = drizzle(sql);
-
 app.use(cors());
 app.use(express.json());
 
+const PORT = process.env.PORT || 3000;
 
-app.get('/', (req, res) => {
-  res.json({ message: 'API rodando com certeza sim sim claro deu certo pode sair API cim cim slaro' });
-});
+// --- ROTAS DE EQUIPAS ---
 
-
-// Listar todas equipes
+// Listar todas as equipas
 app.get('/teams', async (req, res) => {
   try {
     const allTeams = await db.select().from(teams);
-    res.json(allTeams);
+    return res.json(allTeams);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erro ao buscar equipes.' });
+    console.error('Erro ao buscar equipas:', error);
+    return res.status(500).json({ error: 'Erro ao buscar equipas', details: error.message });
   }
 });
 
-//Criar nova equipe
+// Criar nova equipa
 app.post('/teams', async (req, res) => {
   try {
     const { name, code, logoUrl } = req.body;
     const newTeam = await db.insert(teams).values({ name, code, logoUrl }).returning();
-    res.status(201).json(newTeam[0]);
+    return res.status(201).json(newTeam[0]);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erro ao criar equipe.' });
+    console.error('Erro ao criar equipa:', error);
+    return res.status(500).json({ error: 'Erro ao criar equipa.', details: error.message });
   }
 });
 
-//Listar todas partidas
+// --- ROTAS DE PARTIDAS ---
+
+// Listar todas as partidas
 app.get('/matches', async (req, res) => {
   try {
     const allMatches = await db.select().from(matches);
-    res.json(allMatches);
+    return res.json(allMatches);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erro ao buscar partidas.' });
+    console.error('Erro detalhado ao buscar partidas:', error);
+    return res.status(500).json({ error: 'Erro ao buscar partidas', details: error.message });
   }
 });
 
-//Criar nova partida
+// Criar nova partida
 app.post('/matches', async (req, res) => {
   try {
     const { phase, homeTeamId, awayTeamId } = req.body;
     const newMatch = await db.insert(matches).values({
       phase,
-      homeTeamId,
-      awayTeamId,
-      status: 'SCHEDULED'
+      homeTeamId: Number(homeTeamId),
+      awayTeamId: Number(awayTeamId),
+      homeScore: 0,
+      awayScore: 0,
+      status: 'AGENDADO',
+      isLive: false
     }).returning();
-
-    res.status(201).json(newMatch[0]);
+    return res.status(201).json(newMatch[0]);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erro ao criar partida.' });
+    console.error('Erro ao criar partida:', error);
+    return res.status(500).json({ error: 'Erro ao criar partida', details: error.message });
   }
 });
 
-//Atualizar resultado/status da partida
+// Atualizar Placar / Status de uma partida
 app.put('/matches/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { homeScore, awayScore, status, isLive } = req.body;
 
     const updatedMatch = await db.update(matches)
-      .set({ homeScore, awayScore, status, isLive })
+      .set({
+        homeScore: Number(homeScore),
+        awayScore: Number(awayScore),
+        status,
+        isLive: isLive ?? false
+      })
       .where(eq(matches.id, Number(id)))
       .returning();
 
-    res.json(updatedMatch[0]);
+    if (updatedMatch.length === 0) {
+      return res.status(404).json({ error: 'Partida não encontrada' });
+    }
+
+    return res.json(updatedMatch[0]);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erro ao atualizar partida.' });
+    console.error('Erro ao atualizar partida:', error);
+    return res.status(500).json({ error: 'Erro ao atualizar partida', details: error.message });
   }
 });
 
-//Apagar uma partida
-app.delete('/matches/:id', async (req, res) => {
+// --- ROTAS DE EVENTOS ---
+
+// Listar eventos de uma partida específica
+app.get('/matches/:id/events', async (req, res) => {
   try {
     const { id } = req.params;
-    await db.delete(matches).where(eq(matches.id, Number(id)));
-    res.json({ message: 'Partida cancelada com sucesso!' });
+    const events = await db.select().from(matchEvents).where(eq(matchEvents.matchId, Number(id)));
+    return res.json(events);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erro ao apagar a partida.' });
+    console.error('Erro ao buscar eventos:', error);
+    return res.status(500).json({ error: 'Erro ao buscar eventos', details: error.message });
   }
 });
 
+// Criar novo evento (golo, cartão, etc.)
+app.post('/events', async (req, res) => {
+  try {
+    const { matchId, type, minute, playerName, detail } = req.body;
+    const newEvent = await db.insert(matchEvents).values({
+      matchId: Number(matchId),
+      type,
+      minute,
+      playerName,
+      detail
+    }).returning();
+    return res.status(201).json(newEvent[0]);
+  } catch (error) {
+    console.error('Erro ao registrar evento:', error);
+    return res.status(500).json({ error: 'Erro ao registrar evento', details: error.message });
+  }
+});
+
+// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`API do site sis ism rodando na porta: http://localhost:${PORT}`);
+  console.log(`API a rodar na porta: http://localhost:${PORT}`);
 });

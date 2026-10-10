@@ -1,79 +1,91 @@
-import { mockMatches } from '../mockData';
+import React, { useState, useEffect } from 'react';
 
 export default function Dashboard() {
-  // Filtra o primeiro jogo marcado como ao vivo
-  const liveMatch = mockMatches.find(m => m.isLive);
+  const [matches, setMatches] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDashboardData = async () => {
+    try {
+      const [resMatches, resTeams] = await Promise.all([
+        fetch('http://localhost:3000/matches'),
+        fetch('http://localhost:3000/teams')
+      ]);
+
+      const dataMatches = await resMatches.json();
+      const dataTeams = await resTeams.json();
+
+      if (Array.isArray(dataMatches)) setMatches(dataMatches);
+      if (Array.isArray(dataTeams)) setTeams(dataTeams);
+    } catch (error) {
+      console.error('Erro ao buscar dados do Dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+
+    // Atualização automática a cada 5 segundos (Polling para tempo real)
+    const interval = setInterval(fetchDashboardData, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Função auxiliar para obter dados do time pelo ID
+  const getTeam = (id) => teams.find((t) => t.id === id) || { name: 'Time', code: '---' };
+
+  if (loading) return <div style={{ color: '#fff', textAlign: 'center', marginTop: '2rem' }}>Carregando partidas...</div>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Seção Destaque AO VIVO */}
-      {liveMatch && (
-        <section>
-          <span style={{ color: '#00e87a', fontWeight: 'bold', fontSize: '14px' }}>
-            ● AO VIVO
-          </span>
-          <div style={{
-            backgroundColor: '#12121e',
-            border: '1px solid #222235',
-            borderRadius: '12px',
-            padding: '24px',
-            marginTop: '8px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ textAlign: 'left', flex: 1 }}>
-              <h2 style={{ fontSize: '20px' }}>{liveMatch.homeTeam.name}</h2>
-              <span style={{ color: '#8a8a9e', fontSize: '12px' }}>{liveMatch.homeTeam.code}</span>
-            </div>
+    <div style={{ maxWidth: '1000px', margin: '2rem auto', color: '#fff', padding: '0 1rem' }}>
+      <h2 style={{ color: '#00ff88', marginBottom: '1.5rem' }}>Partidas ao Vivo / Agendadas</h2>
 
-            <div style={{ textAlign: 'center', padding: '0 20px' }}>
-              <span style={{ backgroundColor: '#00e87a', color: '#000', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
-                {liveMatch.status}
-              </span>
-              <div style={{ fontSize: '36px', fontWeight: 'bold', margin: '8px 0', letterSpacing: '4px' }}>
-                {liveMatch.homeTeam.score} - {liveMatch.awayTeam.score}
-              </div>
-              <span style={{ color: '#8a8a9e', fontSize: '12px' }}>{liveMatch.phase}</span>
-            </div>
+      {matches.length === 0 ? (
+        <p>Nenhuma partida cadastrada no momento.</p>
+      ) : (
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          {matches.map((match) => {
+            const home = getTeam(match.home_team_id);
+            const away = getTeam(match.away_team_id);
 
-            <div style={{ textAlign: 'right', flex: 1 }}>
-              <h2 style={{ fontSize: '20px' }}>{liveMatch.awayTeam.name}</h2>
-              <span style={{ color: '#8a8a9e', fontSize: '12px' }}>{liveMatch.awayTeam.code}</span>
-            </div>
-          </div>
-        </section>
-      )}
+            return (
+              <div
+                key={match.id}
+                style={{
+                  backgroundColor: '#111',
+                  border: '1px solid #333',
+                  borderRadius: '8px',
+                  padding: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                {/* Time Mandante */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, justifyContent: 'flex-end' }}>
+                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{home.name}</span>
+                </div>
 
-      {/* Lista de Partidas Recentes */}
-      <section>
-        <h3 style={{ fontSize: '16px', color: '#8a8a9e', marginBottom: '12px' }}>
-          FASE ATUAL — SEMIFINAIS
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          {mockMatches.map((match) => (
-            <div key={match.id} style={{
-              backgroundColor: '#12121e',
-              border: '1px solid #222235',
-              borderRadius: '8px',
-              padding: '16px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '12px', color: '#8a8a9e' }}>
-                <span>{match.phase}</span>
-                <span style={{ color: match.isLive ? '#00e87a' : '#8a8a9e' }}>{match.status}</span>
+                {/* Placar e Status */}
+                <div style={{ padding: '0 2rem', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#00ff88', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                    {match.phase} — {match.status}
+                  </span>
+                  <div style={{ fontSize: '2rem', fontWeight: 'bold', letterSpacing: '2px' }}>
+                    {match.home_score} : {match.away_score}
+                  </div>
+                </div>
+
+                {/* Time Visitante */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{away.name}</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span>{match.homeTeam.name}</span>
-                <span style={{ fontWeight: 'bold' }}>{match.homeTeam.score}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{match.awayTeam.name}</span>
-                <span style={{ fontWeight: 'bold' }}>{match.awayTeam.score}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </section>
+      )}
     </div>
   );
 }
