@@ -3,87 +3,120 @@ import React, { useState, useEffect } from 'react';
 export default function Dashboard() {
   const [matches, setMatches] = useState([]);
   const [teams, setTeams] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [homeSquad, setHomeSquad] = useState([]);
+  const [awaySquad, setAwaySquad] = useState([]);
 
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     try {
-      const [resMatches, resTeams] = await Promise.all([
+      const [resM, resT] = await Promise.all([
         fetch('http://localhost:3000/matches'),
         fetch('http://localhost:3000/teams')
       ]);
-
-      const dataMatches = await resMatches.json();
-      const dataTeams = await resTeams.json();
-
-      if (Array.isArray(dataMatches)) setMatches(dataMatches);
-      if (Array.isArray(dataTeams)) setTeams(dataTeams);
-    } catch (error) {
-      console.error('Erro ao buscar dados do Dashboard:', error);
-    } finally {
-      setLoading(false);
+      setMatches(await resM.json());
+      setTeams(await resT.json());
+    } catch (err) {
+      console.error(err);
     }
   };
 
   useEffect(() => {
-    fetchDashboardData();
-
-    // Atualização automática a cada 5 segundos (Polling para tempo real)
-    const interval = setInterval(fetchDashboardData, 5000);
+    fetchData();
+    const interval = setInterval(fetchData, 4000);
     return () => clearInterval(interval);
   }, []);
 
-  // Função auxiliar para obter dados do time pelo ID
-  const getTeam = (id) => teams.find((t) => t.id === id) || { name: 'Time', code: '---' };
+  const handleOpenMatchDetails = async (match) => {
+    setSelectedMatch(match);
+    const homeId = match.homeTeamId ?? match.home_team_id;
+    const awayId = match.awayTeamId ?? match.away_team_id;
 
-  if (loading) return <div style={{ color: '#fff', textAlign: 'center', marginTop: '2rem' }}>Carregando partidas...</div>;
+    const [resEv, resH, resA] = await Promise.all([
+      fetch(`http://localhost:3000/matches/${match.id}/events`),
+      fetch(`http://localhost:3000/teams/${homeId}/players`),
+      fetch(`http://localhost:3000/teams/${awayId}/players`)
+    ]);
+
+    setEvents(await resEv.json());
+    setHomeSquad(await resH.json());
+    setAwaySquad(await resA.json());
+  };
+
+  const getTeam = (id) => teams.find((t) => t.id === Number(id));
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '2rem auto', color: '#fff', padding: '0 1rem' }}>
-      <h2 style={{ color: '#00ff88', marginBottom: '1.5rem' }}>Partidas ao Vivo / Agendadas</h2>
+    <div style={{ maxWidth: '1000px', margin: '2rem auto', color: '#fff', padding: '0 1rem', fontFamily: 'sans-serif' }}>
+      <h2 style={{ color: '#00ff88', marginBottom: '1.5rem', textAlign: 'center' }}>Painel do Racha ao Vivo</h2>
 
-      {matches.length === 0 ? (
-        <p>Nenhuma partida cadastrada no momento.</p>
-      ) : (
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          {matches.map((match) => {
-            const home = getTeam(match.home_team_id);
-            const away = getTeam(match.away_team_id);
+      <div style={{ display: 'grid', gap: '1rem' }}>
+        {matches.map((match) => {
+          const home = getTeam(match.homeTeamId ?? match.home_team_id);
+          const away = getTeam(match.awayTeamId ?? match.away_team_id);
 
-            return (
-              <div
-                key={match.id}
-                style={{
-                  backgroundColor: '#111',
-                  border: '1px solid #333',
-                  borderRadius: '8px',
-                  padding: '1.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}
-              >
-                {/* Time Mandante */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, justifyContent: 'flex-end' }}>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{home.name}</span>
-                </div>
-
-                {/* Placar e Status */}
-                <div style={{ padding: '0 2rem', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#00ff88', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-                    {match.phase} — {match.status}
-                  </span>
-                  <div style={{ fontSize: '2rem', fontWeight: 'bold', letterSpacing: '2px' }}>
-                    {match.home_score} : {match.away_score}
-                  </div>
-                </div>
-
-                {/* Time Visitante */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{away.name}</span>
-                </div>
+          return (
+            <div
+              key={match.id}
+              onClick={() => handleOpenMatchDetails(match)}
+              style={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+            >
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+                <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{home?.name || 'Time A'}</span>
+                {home?.logoUrl && <img src={home.logoUrl} alt="escudo" style={{ width: '35px', height: '35px', borderRadius: '50%' }} />}
               </div>
-            );
-          })}
+
+              <div style={{ padding: '0 2rem', textAlign: 'center', minWidth: '150px' }}>
+                <span style={{ fontSize: '0.8rem', color: '#00ff88' }}>{match.phase}</span>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{match.homeScore} : {match.awayScore}</div>
+              </div>
+
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px' }}>
+                {away?.logoUrl && <img src={away.logoUrl} alt="escudo" style={{ width: '35px', height: '35px', borderRadius: '50%' }} />}
+                <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{away?.name || 'Time B'}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {selectedMatch && (
+        <div onClick={() => setSelectedMatch(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#181818', padding: '2rem', borderRadius: '10px', maxWidth: '750px', width: '90%', border: '1px solid #00ff88', maxHeight: '85vh', overflowY: 'auto' }}>
+            <h3 style={{ color: '#00ff88', textAlign: 'center' }}>{selectedMatch.phase}</h3>
+
+            <h4 style={{ color: '#00ff88', marginTop: '20px' }}>Escalação dos Atletas:</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '10px' }}>
+              <div>
+                <h5>{getTeam(selectedMatch.homeTeamId)?.name}</h5>
+                {homeSquad.map((p) => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#222', padding: '8px', borderRadius: '6px', marginBottom: '8px' }}>
+                    <img src={p.photoUrl || 'https://via.placeholder.com/40'} alt="atleta" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                    <div>
+                      <strong style={{ display: 'block', color: '#00ff88' }}>#{p.number} {p.fullName}</strong>
+                      <span style={{ fontSize: '0.75rem', color: '#aaa' }}>{p.email}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <h5>{getTeam(selectedMatch.awayTeamId)?.name}</h5>
+                {awaySquad.map((p) => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#222', padding: '8px', borderRadius: '6px', marginBottom: '8px' }}>
+                    <img src={p.photoUrl || 'https://via.placeholder.com/40'} alt="atleta" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                    <div>
+                      <strong style={{ display: 'block', color: '#00ff88' }}>#{p.number} {p.fullName}</strong>
+                      <span style={{ fontSize: '0.75rem', color: '#aaa' }}>{p.email}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={() => setSelectedMatch(null)} style={{ width: '100%', padding: '10px', backgroundColor: '#00ff88', color: '#000', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px' }}>
+              Fechar
+            </button>
+          </div>
         </div>
       )}
     </div>
