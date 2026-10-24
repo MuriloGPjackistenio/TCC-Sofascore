@@ -14,7 +14,6 @@ export const teams = pgTable('teams', {
   logoUrl: varchar('logo_url', { length: 500 }),
 });
 
-// Tabela que liga os times aos torneios (Ponto 3)
 export const tournamentTeams = pgTable('tournament_teams', {
   id: serial('id').primaryKey(),
   tournamentId: integer('tournament_id').references(() => tournaments.id, { onDelete: 'cascade' }).notNull(),
@@ -46,6 +45,10 @@ export const matches = pgTable('matches', {
   awayTeamId: integer('away_team_id').references(() => teams.id, { onDelete: 'cascade' }),
   homeScore: integer('home_score').default(0),
   awayScore: integer('away_score').default(0),
+
+  // Placar final de pênaltis salvo direto no banco
+  penaltyScoreHome: integer('penalty_score_home').default(null),
+  penaltyScoreAway: integer('penalty_score_away').default(null),
 });
 
 export const matchEvents = pgTable('match_events', {
