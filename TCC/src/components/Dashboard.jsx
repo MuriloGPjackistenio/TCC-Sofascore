@@ -3,120 +3,135 @@ import React, { useState, useEffect } from 'react';
 export default function Dashboard() {
   const [matches, setMatches] = useState([]);
   const [teams, setTeams] = useState([]);
-  const [selectedMatch, setSelectedMatch] = useState(null);
-  const [events, setEvents] = useState([]);
-  const [homeSquad, setHomeSquad] = useState([]);
-  const [awaySquad, setAwaySquad] = useState([]);
+  const [matchEvents, setMatchEvents] = useState({}); // Guarda os eventos por ID de partida
 
   const fetchData = async () => {
     try {
-      const [resM, resT] = await Promise.all([
+      const [resMatches, resTeams] = await Promise.all([
         fetch('http://localhost:3000/matches'),
         fetch('http://localhost:3000/teams')
       ]);
-      setMatches(await resM.json());
-      setTeams(await resT.json());
+
+      const matchesData = await resMatches.json();
+      const teamsData = await resTeams.json();
+
+      if (Array.isArray(matchesData)) {
+        setMatches(matchesData);
+
+        // Busca os eventos de cada partida individualmente
+        const eventsMap = {};
+        for (const m of matchesData) {
+          const resEv = await fetch(`http://localhost:3000/matches/${m.id}/events`);
+          const evData = await resEv.json();
+          eventsMap[m.id] = Array.isArray(evData) ? evData : [];
+        }
+        setMatchEvents(eventsMap);
+      }
+
+      if (Array.isArray(teamsData)) setTeams(teamsData);
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao carregar dados do dashboard:', err);
     }
   };
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 4000);
+    const interval = setInterval(fetchData, 5000); // Atualiza a cada 5 segundos em tempo real
     return () => clearInterval(interval);
   }, []);
 
-  const handleOpenMatchDetails = async (match) => {
-    setSelectedMatch(match);
-    const homeId = match.homeTeamId ?? match.home_team_id;
-    const awayId = match.awayTeamId ?? match.away_team_id;
-
-    const [resEv, resH, resA] = await Promise.all([
-      fetch(`http://localhost:3000/matches/${match.id}/events`),
-      fetch(`http://localhost:3000/teams/${homeId}/players`),
-      fetch(`http://localhost:3000/teams/${awayId}/players`)
-    ]);
-
-    setEvents(await resEv.json());
-    setHomeSquad(await resH.json());
-    setAwaySquad(await resA.json());
-  };
-
   const getTeam = (id) => teams.find((t) => t.id === Number(id));
 
+  // Ícones e cores para cada tipo de evento do SofaScore
+  const renderEventIcon = (type) => {
+    switch (type) {
+      case 'GOAL':
+      case 'PENALTY_GOAL': return '⚽';
+      case 'OWN_GOAL': return '🤡';
+      case 'VAR_REVIEW': return '🖥️';
+      case 'VAR_CANCEL': return '❌';
+      case 'YELLOW_CARD': return '🟨';
+      case 'RED_CARD': return '🟥';
+      case 'SUBSTITUTION': return '🔄';
+      default: return '⚡';
+    }
+  };
+
   return (
-    <div style={{ maxWidth: '1000px', margin: '2rem auto', color: '#fff', padding: '0 1rem', fontFamily: 'sans-serif' }}>
-      <h2 style={{ color: '#00ff88', marginBottom: '1.5rem', textAlign: 'center' }}>Painel do Racha ao Vivo</h2>
+    <div style={{ maxWidth: '800px', margin: '2rem auto', color: '#fff', fontFamily: 'sans-serif', padding: '0 1rem' }}>
+      <h2 style={{ color: '#00ff88', textAlign: 'center', marginBottom: '25px' }}>Jogos & Acontecimentos ao Vivo</h2>
 
-      <div style={{ display: 'grid', gap: '1rem' }}>
-        {matches.map((match) => {
-          const home = getTeam(match.homeTeamId ?? match.home_team_id);
-          const away = getTeam(match.awayTeamId ?? match.away_team_id);
+      {(!Array.isArray(matches) || matches.length === 0) ? (
+        <div style={{ textAlign: 'center', padding: '30px', backgroundColor: '#111', borderRadius: '8px', color: '#888' }}>
+          Nenhum jogo cadastrado no momento.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '20px' }}>
+          {matches.map((m) => {
+            const home = getTeam(m.homeTeamId ?? m.home_team_id);
+            const away = getTeam(m.awayTeamId ?? m.away_team_id);
+            const events = matchEvents[m.id] || [];
 
-          return (
-            <div
-              key={match.id}
-              onClick={() => handleOpenMatchDetails(match)}
-              style={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-            >
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{home?.name || 'Time A'}</span>
-                {home?.logoUrl && <img src={home.logoUrl} alt="escudo" style={{ width: '35px', height: '35px', borderRadius: '50%' }} />}
-              </div>
+            return (
+              <div key={m.id} style={{ backgroundColor: '#141414', border: '1px solid #262626', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+                
+                {/* Cabeçalho do Card (Fase e Status) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#00ff88', fontWeight: 'bold' }}>{m.phase || 'Partida Oficial'}</span>
+                  <span style={{ fontSize: '0.75rem', backgroundColor: m.status === 'EM_ANDAMENTO' ? '#ff333333' : '#222', color: m.status === 'EM_ANDAMENTO' ? '#ff4444' : '#aaa', padding: '3px 10px', borderRadius: '4px', fontWeight: 'bold' }}>
+                    {m.status === 'EM_ANDAMENTO' ? '🟢 AO VIVO' : m.status}
+                  </span>
+                </div>
 
-              <div style={{ padding: '0 2rem', textAlign: 'center', minWidth: '150px' }}>
-                <span style={{ fontSize: '0.8rem', color: '#00ff88' }}>{match.phase}</span>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{match.homeScore} : {match.awayScore}</div>
-              </div>
+                {/* Placar Principal */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                  {/* Mandante */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, justifyContent: 'flex-start' }}>
+                    {home?.logoUrl && <img src={home.logoUrl} alt={home.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />}
+                    <strong style={{ fontSize: '1.1rem' }}>{home?.name || 'Mandante'}</strong>
+                  </div>
 
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px' }}>
-                {away?.logoUrl && <img src={away.logoUrl} alt="escudo" style={{ width: '35px', height: '35px', borderRadius: '50%' }} />}
-                <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{away?.name || 'Time B'}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {selectedMatch && (
-        <div onClick={() => setSelectedMatch(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#181818', padding: '2rem', borderRadius: '10px', maxWidth: '750px', width: '90%', border: '1px solid #00ff88', maxHeight: '85vh', overflowY: 'auto' }}>
-            <h3 style={{ color: '#00ff88', textAlign: 'center' }}>{selectedMatch.phase}</h3>
-
-            <h4 style={{ color: '#00ff88', marginTop: '20px' }}>Escalação dos Atletas:</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '10px' }}>
-              <div>
-                <h5>{getTeam(selectedMatch.homeTeamId)?.name}</h5>
-                {homeSquad.map((p) => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#222', padding: '8px', borderRadius: '6px', marginBottom: '8px' }}>
-                    <img src={p.photoUrl || 'https://via.placeholder.com/40'} alt="atleta" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                    <div>
-                      <strong style={{ display: 'block', color: '#00ff88' }}>#{p.number} {p.fullName}</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#aaa' }}>{p.email}</span>
+                  {/* Placar */}
+                  <div style={{ textAlign: 'center', padding: '0 20px' }}>
+                    <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#00ff88', letterSpacing: '2px' }}>
+                      {m.homeScore ?? 0} - {m.awayScore ?? 0}
                     </div>
                   </div>
-                ))}
-              </div>
 
-              <div>
-                <h5>{getTeam(selectedMatch.awayTeamId)?.name}</h5>
-                {awaySquad.map((p) => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#222', padding: '8px', borderRadius: '6px', marginBottom: '8px' }}>
-                    <img src={p.photoUrl || 'https://via.placeholder.com/40'} alt="atleta" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                    <div>
-                      <strong style={{ display: 'block', color: '#00ff88' }}>#{p.number} {p.fullName}</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#aaa' }}>{p.email}</span>
-                    </div>
+                  {/* Visitante */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, justifyContent: 'flex-end' }}>
+                    <strong style={{ fontSize: '1.1rem', textAlign: 'right' }}>{away?.name || 'Visitante'}</strong>
+                    {away?.logoUrl && <img src={away.logoUrl} alt={away.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            <button onClick={() => setSelectedMatch(null)} style={{ width: '100%', padding: '10px', backgroundColor: '#00ff88', color: '#000', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px' }}>
-              Fechar
-            </button>
-          </div>
+                {/* Timeline de Eventos Estilo SofaScore */}
+                <div style={{ backgroundColor: '#1a1a1a', borderRadius: '8px', padding: '12px', border: '1px solid #222' }}>
+                  <h4 style={{ color: '#aaa', fontSize: '0.85rem', margin: '0 0 10px 0', textTransform: 'uppercase', letterSpacing: '1px' }}>Acontecimentos da Partida</h4>
+                  
+                  {events.length === 0 ? (
+                    <p style={{ color: '#666', fontSize: '0.85rem', margin: 0, textAlign: 'center' }}>Nenhum evento registrado até o momento.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {events.map((ev, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem', backgroundColor: '#222', padding: '6px 10px', borderRadius: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{renderEventIcon(ev.type)}</span>
+                            <span style={{ fontWeight: 'bold' }}>{ev.playerName || 'Evento'}</span>
+                            {ev.playerOutName && <span style={{ color: '#888' }}>(Sai: {ev.playerOutName})</span>}
+                          </div>
+                          <span style={{ color: '#00ff88', fontWeight: 'bold', backgroundColor: '#111', padding: '2px 6px', borderRadius: '4px' }}>
+                            {ev.minute ? `${ev.minute}'` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

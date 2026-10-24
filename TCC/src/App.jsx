@@ -1,92 +1,40 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Dashboard from './components/Dashboard';
-import AdminPanel from './components/AdminPanel';
 import Bracket from './components/Bracket';
+import StandingsTable from './components/StandingsTable';
+import AdminPanel from './components/AdminPanel';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [currentTab, setCurrentTab] = useState('dashboard');
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1100px', margin: '0 auto' }}>
-      {/* Cabeçalho Ajustado */}
-      <header style={{
-        display: 'flex', 
-        justify: 'space-between', 
-        alignItems: 'center', 
-        paddingBottom: '20px',
-        borderBottom: '1px solid #222235',
-        marginBottom: '32px'
-      }}>
-        {/* Logo */}
-        <h1 style={{ 
-          color: '#00e87a', 
-          fontSize: '26px', 
-          fontWeight: 'bold', 
-          letterSpacing: '2px',
-          margin: 0 
-        }}>
-          KNOCKR
-        </h1>
+    <div style={{ backgroundColor: '#0d0d0d', minHeight: '100vh', color: '#fff' }}>
+      {/* Barra de Navegação Superior */}
+      <nav style={{ display: 'flex', justifyContent: 'center', gap: '20px', padding: '20px', borderBottom: '1px solid #222' }}>
+        <h1 style={{ color: '#00ff88', margin: 0, fontSize: '1.2rem', alignSelf: 'center', marginRight: '20px' }}>KNOCKR</h1>
         
-        {/* Menu de Navegação */}
-        <nav style={{ display: 'flex', gap: '12px' }}>
-          <button 
-            onClick={() => setActiveTab('dashboard')} 
-            style={{ 
-              background: activeTab === 'dashboard' ? '#12121e' : 'transparent', 
-              border: activeTab === 'dashboard' ? '1px solid #00e87a' : '1px solid transparent', 
-              color: activeTab === 'dashboard' ? '#00e87a' : '#8a8a9e', 
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer', 
-              fontWeight: 'bold',
-              fontSize: '13px',
-              transition: 'all 0.2s'
-            }}>
-            DASHBOARD
-          </button>
+        <button onClick={() => setCurrentTab('dashboard')} style={navBtnStyle(currentTab === 'dashboard')}>DASHBOARD</button>
+        <button onClick={() => setCurrentTab('bracket')} style={navBtnStyle(currentTab === 'bracket')}>CHAVEAMENTO</button>
+        <button onClick={() => setCurrentTab('standings')} style={navBtnStyle(currentTab === 'standings')}>📊 TABELA</button>
+        <button onClick={() => setCurrentTab('admin')} style={navBtnStyle(currentTab === 'admin')}>ADMIN</button>
+      </nav>
 
-          <button 
-            onClick={() => setActiveTab('bracket')} 
-            style={{ 
-              background: activeTab === 'bracket' ? '#12121e' : 'transparent', 
-              border: activeTab === 'bracket' ? '#00e87a' : '1px solid transparent', 
-              color: activeTab === 'bracket' ? '#00e87a' : '#8a8a9e', 
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer', 
-              fontWeight: 'bold',
-              fontSize: '13px',
-              transition: 'all 0.2s'
-            }}>
-            CHAVEAMENTO
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('admin')} 
-            style={{ 
-              background: activeTab === 'admin' ? '#12121e' : 'transparent', 
-              border: activeTab === 'admin' ? '#00e87a' : '#8a8a9e', 
-              color: activeTab === 'admin' ? '#00e87a' : '#8a8a9e', 
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer', 
-              fontWeight: 'bold',
-              fontSize: '13px',
-              transition: 'all 0.2s'
-            }}>
-            ADMIN
-          </button>
-        </nav>
-      </header>
-
-      {/* Exibição das Telas */}
-      <main>
-        {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'bracket' && <Bracket />}
-        {activeTab === 'admin' && <AdminPanel />}
-      </main>
+      {/* Conteúdo Dinâmico */}
+      {currentTab === 'dashboard' && <Dashboard />}
+      {currentTab === 'bracket' && <Bracket />}
+      {currentTab === 'standings' && <StandingsTable />}
+      {currentTab === 'admin' && <AdminPanel />}
     </div>
-    
   );
 }
+
+const navBtnStyle = (isActive) => ({
+  background: 'none',
+  border: 'none',
+  color: isActive ? '#00ff88' : '#aaa',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  padding: '5px 10px',
+  borderBottom: isActive ? '2px solid #00ff88' : 'none'
+});
