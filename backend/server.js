@@ -13,7 +13,12 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// --- ROTAS DE TORNEIOS ---
+//RAIZ
+app.get('/', (req, res) => {
+  res.json({ message: 'API do TCC Sofascore está a rodar com sucesso!' });
+});
+
+//Tornei
 app.get('/tournaments', async (req, res) => {
   try {
     const allTournaments = await db.select().from(tournaments);
