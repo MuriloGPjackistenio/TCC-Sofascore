@@ -19,7 +19,6 @@ app.get('/tournaments', async (req, res) => {
     const allTournaments = await db.select().from(tournaments);
     return res.json(allTournaments || []);
   } catch (error) {
-    console.error("Erro em GET /tournaments:", error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -44,7 +43,6 @@ app.post('/tournaments', async (req, res) => {
 
     return res.status(201).json(newTournament);
   } catch (error) {
-    console.error("Erro ao criar torneio:", error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -64,6 +62,16 @@ app.get('/tournaments/:id/teams', async (req, res) => {
   }
 });
 
+app.delete('/tournaments/:id', async (req, res) => {
+  try {
+    const tournamentIdNum = Number(req.params.id);
+    await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, tournamentIdNum));
+    await db.delete(tournaments).where(eq(tournaments.id, tournamentIdNum));
+    return res.json({ message: 'Torneio apagado com sucesso' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
 // --- ROTAS DE EQUIPAS E ELENCO ---
 app.get('/teams', async (req, res) => {
   try {
@@ -137,7 +145,6 @@ app.get('/matches', async (req, res) => {
     const allMatches = await db.select().from(matches);
     return res.json(allMatches || []);
   } catch (error) {
-    console.error("Erro em GET /matches:", error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -145,7 +152,6 @@ app.get('/matches', async (req, res) => {
 app.post('/matches', async (req, res) => {
   try {
     const { phase, homeTeamId, awayTeamId, scheduledAt, hasExtraTime, tournamentId } = req.body;
-    
     const dateObj = scheduledAt ? new Date(scheduledAt) : new Date();
 
     const [newMatch] = await db.insert(matches).values({
@@ -162,20 +168,21 @@ app.post('/matches', async (req, res) => {
 
     return res.status(201).json(newMatch);
   } catch (error) {
-    console.error("Erro ao agendar partida:", error);
     return res.status(500).json({ error: error.message });
   }
 });
 
 app.patch('/matches/:id/clock', async (req, res) => {
   try {
-    const { status, currentMinute, addedMinutes } = req.body;
+    const { status, currentMinute, addedMinutes, penaltyScoreHome, penaltyScoreAway } = req.body;
     const matchId = Number(req.params.id);
 
     const updateData = {};
     if (status) updateData.status = status;
     if (currentMinute !== undefined) updateData.currentMinute = Number(currentMinute);
     if (addedMinutes !== undefined) updateData.addedMinutes = Number(addedMinutes);
+    if (penaltyScoreHome !== undefined) updateData.penaltyScoreHome = penaltyScoreHome !== null ? Number(penaltyScoreHome) : null;
+    if (penaltyScoreAway !== undefined) updateData.penaltyScoreAway = penaltyScoreAway !== null ? Number(penaltyScoreAway) : null;
 
     const [updated] = await db.update(matches).set(updateData).where(eq(matches.id, matchId)).returning();
     return res.json(updated);
@@ -184,7 +191,6 @@ app.patch('/matches/:id/clock', async (req, res) => {
   }
 });
 
-// Rota para buscar os jogadores expulsos de uma partida específica
 app.get('/matches/:id/expelled-players', async (req, res) => {
   try {
     const matchIdNum = Number(req.params.id);
@@ -199,7 +205,7 @@ app.get('/matches/:id/expelled-players', async (req, res) => {
   }
 });
 
-// --- EVENTOS DO JOGO & VAR ---
+// --- EVENTOS DO JOGO, VAR & EXCLUSÃO ---
 app.post('/events', async (req, res) => {
   try {
     const { matchId, type, minute, playerName, playerOutName, detail, teamId } = req.body;
@@ -209,28 +215,25 @@ app.post('/events', async (req, res) => {
       return res.status(404).json({ error: 'Partida não encontrada.' });
     }
 
-    // Regra: Bloqueio de ação sem jogador
     const typesRequiringPlayer = ['GOAL', 'PENALTY_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION'];
     if (typesRequiringPlayer.includes(type) && !playerName) {
-      return res.status(400).json({ error: 'Selecione o jogador envolvido para registrar esta ação!' });
+      return res.status(400).json({ error: 'Selecione o jogador envolvido!' });
     }
 
     if (type === 'SUBSTITUTION' && !playerOutName) {
       return res.status(400).json({ error: 'Selecione o jogador que está saindo da partida!' });
     }
 
-    // Regra: Não permitir ações de jogador expulso
     if (playerName) {
       const redCards = await db.select().from(matchEvents).where(
         and(eq(matchEvents.matchId, Number(matchId)), eq(matchEvents.type, 'RED_CARD'))
       );
       const isExpelled = redCards.some(ev => ev.playerName === playerName);
       if (isExpelled) {
-        return res.status(400).json({ error: `O jogador ${playerName} foi expulso e não pode mais atuar nesta partida!` });
+        return res.status(400).json({ error: `O jogador ${playerName} foi expulso e não pode atuar nesta partida!` });
       }
     }
 
-    // Validação do Limite de Minutagem
     const maxRegulationTime = currentMatch.hasExtraTime ? 120 : 90;
     const parsedMinute = parseInt(minute, 10);
 
@@ -255,7 +258,6 @@ app.post('/events', async (req, res) => {
       detail
     }).returning();
 
-    // Atualização de Placar
     const homeId = Number(currentMatch.homeTeamId);
     const selectedTeamId = Number(teamId);
 
@@ -287,7 +289,51 @@ app.post('/events', async (req, res) => {
 
     return res.status(201).json(newEvent);
   } catch (error) {
-    console.error("Erro ao registrar evento:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// NOVA ROTA: ROTA DE DELETAR EVENTO NO PAINEL ADMIN
+app.delete('/events/:id', async (req, res) => {
+  try {
+    const eventId = Number(req.params.id);
+    const [eventToDelete] = await db.select().from(matchEvents).where(eq(matchEvents.id, eventId));
+
+    if (!eventToDelete) {
+      return res.status(404).json({ error: 'Evento não encontrado.' });
+    }
+
+    const [match] = await db.select().from(matches).where(eq(matches.id, eventToDelete.matchId));
+
+    // Se o evento a apagar for um golo, recalcula e subtrai o ponto
+    if (match && eventToDelete.teamId) {
+      const homeId = Number(match.homeTeamId);
+      const teamId = Number(eventToDelete.teamId);
+
+      if (eventToDelete.type === 'GOAL' || eventToDelete.type === 'PENALTY_GOAL') {
+        if (teamId === homeId) {
+          const newScore = Math.max(0, (match.homeScore || 0) - 1);
+          await db.update(matches).set({ homeScore: newScore }).where(eq(matches.id, match.id));
+        } else {
+          const newScore = Math.max(0, (match.awayScore || 0) - 1);
+          await db.update(matches).set({ awayScore: newScore }).where(eq(matches.id, match.id));
+        }
+      }
+
+      if (eventToDelete.type === 'OWN_GOAL') {
+        if (teamId === homeId) {
+          const newScore = Math.max(0, (match.awayScore || 0) - 1);
+          await db.update(matches).set({ awayScore: newScore }).where(eq(matches.id, match.id));
+        } else {
+          const newScore = Math.max(0, (match.homeScore || 0) - 1);
+          await db.update(matches).set({ homeScore: newScore }).where(eq(matches.id, match.id));
+        }
+      }
+    }
+
+    await db.delete(matchEvents).where(eq(matchEvents.id, eventId));
+    return res.json({ message: 'Evento removido com sucesso!' });
+  } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
