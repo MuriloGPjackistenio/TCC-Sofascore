@@ -8,7 +8,7 @@ import { eq, or, and } from 'drizzle-orm';
 dotenv.config();
 
 const allowedOrigins = [
-  'https://knockr-tau.vercel.app/',
+  'https://knockr-tau.vercel.app',
 ];
 const cors_config = {
   origin: allowedOrigins,
