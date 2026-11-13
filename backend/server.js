@@ -9,13 +9,14 @@ dotenv.config();
 
 const allowedOrigins = [
   'https://knockr-tau.vercel.app/',
-
 ];
-
+const cors_config = {
+  origin: allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}
 const app = express();
-app.use(cors({
-  origin: allowedOrigins
-}));
+app.use(cors(cors_config));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
@@ -64,9 +65,9 @@ app.get('/tournaments/:id/teams', async (req, res) => {
     const tId = Number(req.params.id);
     const relations = await db.select().from(tournamentTeams).where(eq(tournamentTeams.tournamentId, tId));
     const teamIds = relations.map(r => r.teamId);
-    
+
     if (teamIds.length === 0) return res.json([]);
-    
+
     const allTeams = await db.select().from(teams);
     return res.json(allTeams.filter(t => teamIds.includes(t.id)));
   } catch (error) {
@@ -209,7 +210,7 @@ app.get('/matches/:id/expelled-players', async (req, res) => {
     const redCards = await db.select().from(matchEvents).where(
       and(eq(matchEvents.matchId, matchIdNum), eq(matchEvents.type, 'RED_CARD'))
     );
-    
+
     const expelledNames = redCards.map(ev => ev.playerName).filter(Boolean);
     return res.json(expelledNames);
   } catch (error) {
