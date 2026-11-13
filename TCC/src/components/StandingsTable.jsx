@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../api';
 
 export default function StandingsTable() {
   const [tournaments, setTournaments] = useState([]);
@@ -7,7 +8,7 @@ export default function StandingsTable() {
 
   useEffect(() => {
     // Busca apenas torneios do tipo PONTOS_CORRIDOS
-    fetch('http://localhost:3000/tournaments')
+    fetch(`${API_URL}/tournaments`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -28,7 +29,7 @@ export default function StandingsTable() {
     }
 
     // Busca a classificação filtrada pelo torneio selecionado
-    fetch(`http://localhost:3000/standings?tournamentId=${selectedTournamentId}`)
+    fetch(`${API_URL}/standings?tournamentId=${selectedTournamentId}`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setStandings(data);

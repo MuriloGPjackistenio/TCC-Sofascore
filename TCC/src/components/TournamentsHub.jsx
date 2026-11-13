@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import StandingsTable from './StandingsTable';
 import Bracket from './Bracket';
+import { API_URL } from '../api';
 
 export default function TournamentsHub() {
   const [tournaments, setTournaments] = useState([]);
@@ -8,7 +9,7 @@ export default function TournamentsHub() {
 
   useEffect(() => {
     // Busca a lista de torneios cadastrados no backend
-    fetch('http://localhost:3000/tournaments')
+    fetch(`${API_URL}/tournaments`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {

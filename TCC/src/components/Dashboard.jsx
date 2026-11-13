@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../api';
 
 export default function Dashboard() {
   const [matches, setMatches] = useState([]);
@@ -8,8 +9,8 @@ export default function Dashboard() {
   const fetchData = async () => {
     try {
       const [resMatches, resTeams] = await Promise.all([
-        fetch('http://localhost:3000/matches'),
-        fetch('http://localhost:3000/teams')
+        fetch(`${API_URL}/matches`),
+        fetch(`${API_URL}/teams`)
       ]);
 
       const matchesData = await resMatches.json();
@@ -21,7 +22,7 @@ export default function Dashboard() {
         // Busca os eventos de cada partida individualmente
         const eventsMap = {};
         for (const m of matchesData) {
-          const resEv = await fetch(`http://localhost:3000/matches/${m.id}/events`);
+          const resEv = await fetch(`${API_URL}/matches/${m.id}/events`);
           const evData = await resEv.json();
           eventsMap[m.id] = Array.isArray(evData) ? evData : [];
         }

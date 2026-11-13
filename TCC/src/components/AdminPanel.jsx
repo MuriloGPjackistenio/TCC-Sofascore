@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import { API_URL } from '../api';
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('tournaments');
@@ -52,9 +52,9 @@ export default function AdminPanel() {
   const fetchData = async () => {
     try {
       const [resT, resTeams, resM] = await Promise.all([
-        fetch('http://localhost:3000/tournaments'),
-        fetch('http://localhost:3000/teams'),
-        fetch('http://localhost:3000/matches')
+        fetch(`${API_URL}/tournaments`),
+        fetch(`${API_URL}/teams`),
+        fetch(`${API_URL}/matches`)
       ]);
       setTournaments(await resT.json());
       setTeams(await resTeams.json());
@@ -74,8 +74,8 @@ export default function AdminPanel() {
     }
     try {
       const [resEv, resExp] = await Promise.all([
-        fetch(`http://localhost:3000/matches/${selectedMatchId}/events`),
-        fetch(`http://localhost:3000/matches/${selectedMatchId}/expelled-players`)
+        fetch(`${API_URL}/matches/${selectedMatchId}/events`),
+        fetch(`${API_URL}/matches/${selectedMatchId}/expelled-players`)
       ]);
       setMatchEventsList(await resEv.json());
       setExpelledPlayers(await resExp.json());
@@ -90,14 +90,14 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (!eventTeamId) return setTeamPlayers([]);
-    fetch(`http://localhost:3000/teams/${eventTeamId}/players`)
+    fetch(`${API_URL}/teams/${eventTeamId}/players`)
       .then((res) => res.json())
       .then((data) => setTeamPlayers(Array.isArray(data) ? data : []));
   }, [eventTeamId]);
 
   useEffect(() => {
     if (!penaltyTeamId) return setPenaltyPlayersList([]);
-    fetch(`http://localhost:3000/teams/${penaltyTeamId}/players`)
+    fetch(`${API_URL}/teams/${penaltyTeamId}/players`)
       .then((res) => res.json())
       .then((data) => setPenaltyPlayersList(Array.isArray(data) ? data : []));
   }, [penaltyTeamId]);
@@ -106,7 +106,7 @@ export default function AdminPanel() {
     e.preventDefault();
     if (!tournamentName) return alert('Digite o nome do torneio!');
 
-    await fetch('http://localhost:3000/tournaments', {
+    await fetch(`${API_URL}/tournaments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: tournamentName, type: tournamentType, teamIds: selectedTeamIds }),
@@ -119,7 +119,7 @@ export default function AdminPanel() {
 
   const handleDeleteTournament = async (id, name) => {
     if (!window.confirm(`Deseja apagar o torneio "${name}"?`)) return;
-    await fetch(`http://localhost:3000/tournaments/${id}`, { method: 'DELETE' });
+    await fetch(`${API_URL}/tournaments/${id}`, { method: 'DELETE' });
     alert('🗑️ Torneio apagado!');
     fetchData();
   };
@@ -128,7 +128,7 @@ export default function AdminPanel() {
     e.preventDefault();
     if (!teamName || !teamCode) return alert('Preencha o nome e a sigla do time!');
 
-    await fetch('http://localhost:3000/teams', {
+    await fetch(`${API_URL}/teams`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: teamName, code: teamCode, logoUrl, squad: playersList }),
@@ -142,7 +142,7 @@ export default function AdminPanel() {
 
   const handleDeleteTeam = async (id, name) => {
     if (!window.confirm(`Apagar o time "${name}"?`)) return;
-    await fetch(`http://localhost:3000/teams/${id}`, { method: 'DELETE' });
+    await fetch(`${API_URL}/teams/${id}`, { method: 'DELETE' });
     fetchData();
   };
 
@@ -152,7 +152,7 @@ export default function AdminPanel() {
       return alert('Preencha todos os campos da partida!');
     }
 
-    await fetch('http://localhost:3000/matches', {
+    await fetch(`${API_URL}/matches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tournamentId: selectedTournamentId, phase, homeTeamId, awayTeamId, scheduledAt, hasExtraTime }),
@@ -164,7 +164,7 @@ export default function AdminPanel() {
   };
 
   const handleUpdateClock = async (newStatus) => {
-    await fetch(`http://localhost:3000/matches/${selectedMatchId}/clock`, {
+    await fetch(`${API_URL}/matches/${selectedMatchId}/clock`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
@@ -176,7 +176,7 @@ export default function AdminPanel() {
     e.preventDefault();
     if (!selectedMatchId) return alert('Selecione uma partida primeiro!');
 
-    await fetch(`http://localhost:3000/matches/${selectedMatchId}/clock`, {
+    await fetch(`${API_URL}/matches/${selectedMatchId}/clock`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ addedMinutes: Number(addedMinutesInput || 0) }),
@@ -200,7 +200,7 @@ export default function AdminPanel() {
       return alert('⚠️ Selecione o atleta que vai sair de campo!');
     }
 
-    const res = await fetch('http://localhost:3000/events', {
+    const res = await fetch(`${API_URL}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -227,7 +227,7 @@ export default function AdminPanel() {
   const handleDeleteEvent = async (eventId) => {
     if (!window.confirm('Deseja realmente remover este evento da partida?')) return;
 
-    const res = await fetch(`http://localhost:3000/events/${eventId}`, {
+    const res = await fetch(`${API_URL}/events/${eventId}`, {
       method: 'DELETE'
     });
 

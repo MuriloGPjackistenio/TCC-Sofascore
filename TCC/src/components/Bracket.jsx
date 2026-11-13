@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import { API_URL } from '../api';
 
 export default function Bracket() {
   const [tournaments, setTournaments] = useState([]);
@@ -9,7 +9,7 @@ export default function Bracket() {
   const [penaltiesByMatch, setPenaltiesByMatch] = useState({});
 
   useEffect(() => {
-    fetch('http://localhost:3000/tournaments')
+    fetch(`${API_URL}/tournaments`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -20,7 +20,7 @@ export default function Bracket() {
       })
       .catch((err) => console.error(err));
 
-    fetch('http://localhost:3000/teams')
+    fetch(`${API_URL}/teams`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setTeams(data);
@@ -30,7 +30,7 @@ export default function Bracket() {
 
   const fetchMatchesAndPenalties = async () => {
     try {
-      const resMatches = await fetch('http://localhost:3000/matches');
+      const resMatches = await fetch(`${API_URL}/matches`);
       const dataMatches = await resMatches.json();
 
       if (Array.isArray(dataMatches)) {
@@ -38,7 +38,7 @@ export default function Bracket() {
 
         const penMap = {};
         for (const m of dataMatches) {
-          const resEv = await fetch(`http://localhost:3000/matches/${m.id}/events`);
+          const resEv = await fetch(`${API_URL}/matches/${m.id}/events`);
           const events = await resEv.json();
 
           if (Array.isArray(events)) {
