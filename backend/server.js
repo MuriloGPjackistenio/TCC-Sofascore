@@ -7,8 +7,15 @@ import { eq, or, and } from 'drizzle-orm';
 
 dotenv.config();
 
+const allowedOrigins = [
+  'https://knockr-tau.vercel.app/',
+
+];
+
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins
+}));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
